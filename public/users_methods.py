@@ -1,69 +1,105 @@
-from fastapi import APIRouter, Body
-from models.models import User, UserDB, Response
-from typing import Union, Annotated
-import random
-import string
+from fastapi import APIRouter, HTTPException, Depends, Body
+from fastapi.responses import JSONResponse
+from starlette import status
+from models.models import *
+from typing import Annotated, Optional
+from sqlalchemy.orm import Session
+from public.db import engine_s
 
-users_router = APIRouter()
-
-users_database = [UserDB(FirstName='Ilya', LastName='Bob', Nickname='Shama', user_id=1, password='qwerty'),
-                  UserDB(FirstName='Maksim', LastName='Sob', Nickname='Aka', user_id=2, password='qazwsx'),
-                  UserDB(FirstName='Bill', LastName='De', Nickname='Baron', user_id=3, password='123456'),
-                  UserDB(FirstName='Mikhail ', LastName='Vladimirovich ', Nickname='Krug', user_id=4, password='222001')]
+users_router = APIRouter(prefix='/api/users')
+info_router = APIRouter(prefix='/api/users/info')
 
 
-def generate_password():
-    result = ''.join(random.choice(string.ascii_uppercase) for _ in range(random.randint(5, 50)))
-    return result
+def get_session():
+    with Session(engine_s) as session:
+        try:
+            yield session
+        finally:
+            session.close()
 
 
-def find_user(user_id: int) -> Union[UserDB, None]:
-    for user in users_database:
-        if user.user_id == user_id:
-            return user
-    return None
+def coder_passwd(cod: str):
+    return cod * 2
 
 
-@users_router.get("/api/users", response_model=Union[list[User], None])
-def get_users():
-    return users_database
+@users_router.get("/{id}", response_model=Main_User)
+def get_user(id: int, db: Session = Depends(get_session)):
+    user = db.query(User).filter(User.id == id).first()
 
-
-@users_router.get("/api/users/{user_id}", response_model=Union[User, Response])
-def get_user(user_id: int):
-    user = find_user(user_id)
     if user is None:
-        return Response(message="Пользователь не найден")
+        return JSONResponse(status_code=404, content={"message": "Пользователь не найден"})
     else:
-        print(user)
         return user
 
 
-@users_router.post("/api/users", response_model=Union[User, Response])
-def create_user(item: Annotated[User, Body(embed=True, description="Создание нового пользователя")]):
-    user = UserDB(FirstName=item.FirstName, LastName=item.LastName, Nickname=item.Nickname, user_id=item.user_id, password=generate_password())
-    users_database.append(user)
+@users_router.get("/", response_model=Optional[list[Main_User]])
+def get_user_db(db: Session = Depends(get_session)):
+    users = db.query(User).all()
+    if users is None:
+        return JSONResponse(status_code=404, content={"message": " Пользователь не найден"})
+    return users
+
+
+@users_router.post("/", response_model=Main_User, status_code=status.HTTP_201_CREATED)
+def create_user(item: Annotated[Main_User, Body(embed=True)],
+                db: Session = Depends(get_session)):
+    try:
+        user = User(name=item.name)
+
+        if user is None:
+            raise HTTPException(status_code=404, detail="Объект не определён")
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        return user
+    except Exception:
+        raise HTTPException(status_code=500, detail=f"Произошла ошибка при добавлении объекта {user}")
+
+
+@users_router.put("/", response_model=Main_User)
+def edit_user_(item: Annotated[Main_User, Body(embed=True)],
+               db: Session = Depends(get_session)):
+    user = db.query(User).filter(User.id == item.id).first()
+
+    if user is None:
+        return JSONResponse(status_code=404, content={"message": "Пользователь не найден"})
+    user.name = item.name
+    try:
+        db.commit()
+        db.refresh(user)
+    except HTTPException:
+        return JSONResponse(status_code=404, content={"message": ""})
     return user
 
 
-@users_router.put("/api/users", response_model=Union[User, Response])
-def edit_user(item: Annotated[User, Body(embed=True, description="Редактирование пользователя")]):
-    user = find_user(item.user_id)
+@users_router.delete("/{id}", response_class=JSONResponse)
+def delete_user(id: int, db: Session = Depends(get_session)):
+    user = db.query(User).filter(User.id == id).first()
+
     if user is None:
-        return Response(message="Пользователь не найден")
-    else:
-        user.user_id = item.user_id
-        user.FirstName = item.FirstName
-        user.LastName = item.LastName
-        user.Nickname = item.Nickname
-        return user
+        return JSONResponse(status_code=404, content={"message": "Пользователь не найден"})
+    try:
+        db.delete(user)
+        db.commit()
+    except HTTPException:
+        return JSONResponse(content={'message': f'Произошла ошибка при удалении объекта'})
+    return JSONResponse(content={'message': f'Пользователь удалён {id}'})
 
 
-@users_router.delete("/api/users/{user_id}", response_model=Union[list[User], None])
-def delete_user(user_id: int):
-    user = find_user(user_id)
-    if user is None:
-        return Response(message="Пользователь не найден")
-    else:
-        users_database.remove(user)
-        return users_database
+@info_router.post("/{id}", response_model=Main_Info, status_code=status.HTTP_201_CREATED)
+def create_info(item: Annotated[Main_Info, Body(embed=True)],
+                db: Session = Depends(get_session),
+                user: User = Depends(get_user)):
+    try:
+        info = Info(inf=item.inf)
+        info = Info(age=item.age)
+        info.user_id = user.id
+        info.user = user
+        if info is None:
+            raise HTTPException(status_code=404, detail="Объект не определён")
+        db.add(info)
+        db.commit()
+        db.refresh(info)
+        return info
+    except Exception:
+        raise HTTPException(status_code=500, detail=f"Произошла ошибка при добавлении объекта {info}")
