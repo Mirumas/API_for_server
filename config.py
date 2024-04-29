@@ -4,8 +4,10 @@ import os
 
 class Settings:
     app_name: str = "New API"
-    POSTGRES_DATABASE_URLS: str
-    POSTGRES_DATABASE_URLA: str
+    admin_email: str = "mail@mail.ru"
+    DATABASE_URL: str = "sqlite///./database1.db"
+    POSTGRES_DATABASE_URLS: str = "postgresql://postgres:QAZSEDCvgyhn222001@localhost:5432/database1"
+    POSTGRES_DATABASE_URLA: str = "postgresql+asyncpg://postgres:QAZSEDCvgyhn222001@localhost:5432/database1"
     POSTGRES_PORT: str
     POSTGRES_PASSWORD: str
     POSTGRES_USER: str
@@ -14,11 +16,27 @@ class Settings:
 
 
 load_dotenv()
-
 settings = Settings()
+
+
 settings.POSTGRES_PORT = os.environ.get("POSTGRES_PORT")
 settings.POSTGRES_PASSWORD = os.environ.get("POSTGRES_PASSWORD")
 settings.POSTGRES_USER = os.environ.get("POSTGRES_USER")
 settings.POSTGRES_DB = os.environ.get("POSTGRES_DB")
 settings.POSTGRES_HOST = os.environ.get("POSTGRES_HOST")
-settings.POSTGRES_DATABASE_URLS = f"postgresql:"
+
+
+settings.POSTGRES_DATABASE_URLS = f"postgresql:"\
+                                f"//{settings.POSTGRES_USER}:"\
+                                f"{settings.POSTGRES_PASSWORD}" \
+                                f"@{settings.POSTGRES_HOST}:" \
+                                f"{settings.POSTGRES_PORT}" \
+                                f"/{settings.POSTGRES_DB}"
+
+
+settings.POSTGRES_DATABASE_URLA = f"postgresql+asyncpg:"\
+                                f"//{settings.POSTGRES_USER}:"\
+                                f"{settings.POSTGRES_PASSWORD}" \
+                                f"@{settings.POSTGRES_HOST}:" \
+                                f"{settings.POSTGRES_PORT}" \
+                                f"/{settings.POSTGRES_DB}"
