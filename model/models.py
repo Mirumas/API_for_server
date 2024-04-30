@@ -4,6 +4,7 @@ from typing import Annotated, Union
 from pydantic import BaseModel, Field
 from sqlalchemy import Identity, Column, Integer, String, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, DeclarativeBase, relationship
+
 class Base(DeclarativeBase):
     pass
 

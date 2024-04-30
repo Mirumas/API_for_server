@@ -10,7 +10,8 @@ engine_s = create_engine(ur_s, echo=True)
 
 
 def create_tables():
-    Base.metadata.create_all(bind=engine_s)
+    pass
+    # Base.metadata.create_all(bind=engine_s)
 
 def f_bilder():
     with engine_s.connect() as conn:
